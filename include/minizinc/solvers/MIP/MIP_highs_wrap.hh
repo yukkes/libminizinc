@@ -226,6 +226,9 @@ public:
   // Set a (partial) warm-start / MIP-start solution to the current MIP program.
   bool addWarmStart(const std::vector<VarId>& vars, const std::vector<double>& vals) override;
 
+  // Define solver-native hierarchical objectives.
+  bool defineMultipleObjectives(const MultipleObjectives& mo) override;
+
   // Change variable bounds
   void setVarBounds(int iVar, double lb, double ub) override {
     checkHiGHSReturn(_plugin->Highs_changeColBounds(_highs, iVar, lb, ub),

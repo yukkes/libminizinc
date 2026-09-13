@@ -2,6 +2,7 @@
 
 add_library(minizinc_highs OBJECT
   solvers/MIP/MIP_highs_wrap.cpp
+  solvers/MIP/MIP_highs_multiobj.cpp
 
   include/minizinc/solvers/MIP/MIP_highs_wrap.hh
 )
