@@ -1,10 +1,5 @@
 /* -*- mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*- */
 
-/*
- *  Main authors:
- *     Jip J. Dekker <jip.dekker@monash.edu>
- */
-
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -73,10 +68,6 @@ bool MIPHiGHSWrapper::defineMultipleObjectives(const MultipleObjectives& mo) {
     return true;
   }
 
-  // Match the existing Gurobi/Xpress convention: use one global maximize sense and encode each
-  // goal's MIN/MAX direction in its +/-1 weight. Distinct descending priorities make HiGHS run
-  // the goals lexicographically rather than blending them.
-  setObjSense(1);
   checkHiGHSReturn(_plugin->Highs_setBoolOptionValue(_highs, "blend_multi_objectives", 0),
                    "unable to enable lexicographic multi-objective optimization");
 
@@ -94,7 +85,11 @@ bool MIPHiGHSWrapper::defineMultipleObjectives(const MultipleObjectives& mo) {
     }
     coefficients[static_cast<size_t>(objVar)] = 1.0;
     const auto priority = static_cast<HighsInt>(mo.size() - iobj);
-    checkHiGHSReturn(api.addLinearObjective(_highs, obj.getWeight(), 0.0, coefficients.data(), 0.0,
+
+    // MiniZinc's MIP convention uses +1 for MAX and -1 for MIN because Gurobi/Xpress use a
+    // global maximize sense. HiGHS instead interprets a positive multi-objective weight as MIN
+    // and a negative weight as MAX, so invert the MiniZinc weight at this boundary.
+    checkHiGHSReturn(api.addLinearObjective(_highs, -obj.getWeight(), 0.0, coefficients.data(), 0.0,
                                             0.0, priority),
                      "unable to define multi-objective goal " + std::to_string(iobj));
   }
