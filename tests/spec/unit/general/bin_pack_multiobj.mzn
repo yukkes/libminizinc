@@ -1,6 +1,6 @@
 /***
 !Test
-solvers: [gurobi, xpress]
+solvers: [gurobi, highs, xpress]
 expected: !Result
   solution: !Solution
     load: [3, 8, 10]
