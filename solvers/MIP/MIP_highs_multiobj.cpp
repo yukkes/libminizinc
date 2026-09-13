@@ -30,7 +30,7 @@ public:
   explicit HiGHSMultiObjectiveApi(const std::string& dll) {
 #ifdef HIGHS_PLUGIN
     if (dll.empty()) {
-      _plugin = std::make_unique<Plugin>(std::vector<std::string>{
+      _plugin = std::unique_ptr<Plugin>(new Plugin(std::vector<std::string>{
 #ifdef _WIN32
           FileUtils::progpath() + "\\bin\\highs.dll", "highs"
 #elif __APPLE__
@@ -38,9 +38,9 @@ public:
 #else
           FileUtils::progpath() + "/../lib/libhighs.so", "libhighs"
 #endif
-      });
+      }));
     } else {
-      _plugin = std::make_unique<Plugin>(dll);
+      _plugin = std::unique_ptr<Plugin>(new Plugin(dll));
     }
     *(void**)(&_addLinearObjective) = _plugin->symbol("Highs_addLinearObjective");
     *(void**)(&_clearLinearObjectives) = _plugin->symbol("Highs_clearLinearObjectives");
