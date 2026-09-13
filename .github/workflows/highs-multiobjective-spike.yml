@@ -1,0 +1,44 @@
+name: HiGHS multi-objective spike
+
+on:
+  push:
+    branches: [feature/highs-multi-objective]
+
+permissions:
+  contents: read
+
+jobs:
+  highs-multiobjective:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fetch build dependency
+        run: bash scripts/fetch_vendor.sh aarch64-linux-gnu gecode
+
+      - name: Build MiniZinc
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work \
+            -e ROOT=/work \
+            -e CMAKE_GENERATOR="Unix Makefiles" \
+            -e BUILD_REF="${{ github.run_id }}" \
+            -e EXPECT_DEPS="gecode" \
+            quay.io/pypa/manylinux_2_28_aarch64 \
+            bash scripts/build.sh
+
+      - name: Fetch HiGHS
+        run: bash scripts/fetch_vendor.sh aarch64-linux-gnu highs
+
+      - name: Verify lexicographic goal_hierarchy
+        run: |
+          set -eux
+          export PATH="$PWD/minizinc/bin:$PATH"
+          export LD_LIBRARY_PATH="$PWD/vendor/highs/lib64:${LD_LIBRARY_PATH:-}"
+          minizinc --version
+          minizinc --solvers | grep HiGHS
+          output=$(minizinc --solver highs tests/spec/unit/general/bin_pack_multiobj.mzn)
+          printf '%s\n' "$output"
+          grep -Fq 'load = [3, 8, 10]' <<<"$output"
