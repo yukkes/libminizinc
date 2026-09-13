@@ -10,7 +10,7 @@ permissions:
 jobs:
   highs-multiobjective:
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 8
+    timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -29,10 +29,10 @@ jobs:
             quay.io/pypa/manylinux_2_28_aarch64 \
             bash scripts/build.sh
 
-      - name: Fetch HiGHS
+      - name: Fetch current HiGHS
         run: bash scripts/fetch_vendor.sh aarch64-linux-gnu highs
 
-      - name: Verify lexicographic goal_hierarchy
+      - name: Verify lexicographic goal_hierarchy with current HiGHS
         run: |
           set -eux
           export PATH="$PWD/minizinc/bin:$PATH"
@@ -40,5 +40,42 @@ jobs:
           minizinc --version
           minizinc --solvers | grep HiGHS
           output=$(minizinc --solver highs tests/spec/unit/general/bin_pack_multiobj.mzn)
+          printf '%s\n' "$output"
+          grep -Fq 'load = [3, 8, 10]' <<<"$output"
+
+      - name: Cache HiGHS 1.10.0
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/libminizinc/highs-1.10.0
+          key: highs-1.10.0-linux-arm64-v1
+
+      - name: Build HiGHS 1.10.0
+        run: |
+          set -eux
+          HIGHS_CACHE="$HOME/.cache/libminizinc/highs-1.10.0"
+          HIGHS_DLL="$HIGHS_CACHE/libhighs.so.1.10.0"
+          if [ ! -f "$HIGHS_DLL" ]; then
+            rm -rf "$RUNNER_TEMP/highs-src" "$RUNNER_TEMP/highs-build"
+            mkdir -p "$RUNNER_TEMP/highs-src" "$HIGHS_CACHE"
+            curl --fail --location --retry 3 \
+              https://github.com/ERGO-Code/HiGHS/archive/refs/tags/v1.10.0.tar.gz \
+              --output "$RUNNER_TEMP/highs-1.10.0.tar.gz"
+            tar -xzf "$RUNNER_TEMP/highs-1.10.0.tar.gz" \
+              -C "$RUNNER_TEMP/highs-src" --strip-components=1
+            cmake -S "$RUNNER_TEMP/highs-src" -B "$RUNNER_TEMP/highs-build" \
+              -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DFAST_BUILD=ON
+            cmake --build "$RUNNER_TEMP/highs-build" --target highs --parallel 2
+            cp "$RUNNER_TEMP/highs-build/lib/libhighs.so.1.10.0" "$HIGHS_DLL"
+          fi
+          ln -sf "$(basename "$HIGHS_DLL")" "$HIGHS_CACHE/libhighs.so"
+          ln -sf "$(basename "$HIGHS_DLL")" "$HIGHS_CACHE/libhighs.so.1"
+          ls -l "$HIGHS_CACHE"
+
+      - name: Verify lexicographic goal_hierarchy with HiGHS 1.10.0
+        run: |
+          set -eux
+          export PATH="$PWD/minizinc/bin:$PATH"
+          HIGHS_DLL="$HOME/.cache/libminizinc/highs-1.10.0/libhighs.so.1.10.0"
+          output=$(minizinc --solver highs --highs-dll "$HIGHS_DLL" tests/spec/unit/general/bin_pack_multiobj.mzn)
           printf '%s\n' "$output"
           grep -Fq 'load = [3, 8, 10]' <<<"$output"
